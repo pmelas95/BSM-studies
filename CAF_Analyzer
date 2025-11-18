@@ -1,0 +1,232 @@
+{
+#include "TROOT.h"
+#include "TFile.h"
+#include "TTree.h"
+#include "TBranch.h"
+#include "TCanvas.h"
+#include "TLegend.h"
+#include "TH1D.h"
+#include "TGraphAsymmErrors.h"
+#include "TEfficiency.h"
+#include "TStyle.h"
+
+#include <vector>
+#include <iostream>
+
+gInterpreter->GenerateDictionary("vector<vector<int> >", "vector");
+
+// Input file
+TFile *f = new TFile("/pnfs/dune/scratch/users/pmelas/something.root");
+TTree *t10 = (TTree*)f->Get("t10");
+
+// Declare and initialize pointers
+std::vector<int> *mode3 = 0;
+std::vector<int> *Reco_muon_or_pion = 0;
+std::vector<std::vector<double>> *electron_theta_reco = 0;
+std::vector<std::vector<double>> *electron_E_reco = 0;
+std::vector<std::vector<int>> *True_ELectron = 0;
+std::vector<int> *electron_count = 0;
+std::vector<int> *proton_count = 0;
+std::vector<int> *pion0_count = 0;
+std::vector<int> *gamma_count = 0;
+std::vector<int> *lambda_c_count = 0;
+std::vector<int> *sigma_c_count = 0;
+std::vector<int> *d_plus_count = 0;
+std::vector<double> *hadronic_calo_energy = 0;
+std::vector<std::vector<double>> *ELectron_nc_theta = 0;
+std::vector<std::vector<double>> *ELectron_nc_energy = 0;
+
+// Set branch addresses
+t10->SetBranchAddress("mode3", &mode3);
+t10->SetBranchAddress("ELectron_nc_theta", &ELectron_nc_theta);
+t10->SetBranchAddress("ELectron_nc_energy", &ELectron_nc_energy);
+t10->SetBranchAddress("electron_theta_reco", &electron_theta_reco);
+t10->SetBranchAddress("electron_E_reco", &electron_E_reco);
+t10->SetBranchAddress("True_ELectron", &True_ELectron);
+t10->SetBranchAddress("electron_count", &electron_count);
+t10->SetBranchAddress("proton_count", &proton_count);
+t10->SetBranchAddress("Reco_muon_or_pion", &Reco_muon_or_pion);
+t10->SetBranchAddress("pion0_count", &pion0_count);
+t10->SetBranchAddress("gamma_count", &gamma_count);
+t10->SetBranchAddress("lambda_c_count", &lambda_c_count);
+t10->SetBranchAddress("sigma_c_count", &sigma_c_count);
+t10->SetBranchAddress("d_plus_count", &d_plus_count);
+t10->SetBranchAddress("hadronic_calo_energy", &hadronic_calo_energy);
+
+// Histogram binning
+const Int_t NB = 20;
+Double_t med[NB + 1] = {0., 0.2555, 0.511 , 0.7665, 1.022 , 1.2775, 1.533 , 1.7885, 2.044 , 2.2995, 
+                        2.555 , 2.8105, 3.066 , 3.3215, 3.577 , 3.8325, 4.088 , 4.3435, 4.599 , 4.8545, 5.11};
+
+TH1D *h_signal    = new TH1D("h_signal", "Signal: E*#theta^{2};E#theta^{2} [MeV*rad^{2}];Events", NB, med);
+TH1D *h_ccqe      = new TH1D("h_ccqe", "CCQE: E*#theta^{2};E#theta^{2} [MeV*rad^{2}];Events", NB, med);
+TH1D *h_pi0misid  = new TH1D("h_pi0misid", "Pi0 misID: E*#theta^{2};E#theta^{2} [MeV*rad^{2}];Events", NB, med);
+
+// Efficiency bins
+const Int_t NBINS = 12;
+Double_t edges[NBINS + 1] = {0, 100, 200 , 300 ,400, 500, 600, 700, 800, 900, 1000, 1100, 1200};
+
+TH1F *Efficiency     = new TH1F("Efficiency", "Efficiency;E [MeV];Efficiency", NBINS, edges);
+TH1F *COSMIC_89099   = new TH1F("COSMIC_89099", "NC Interaction (True);E [MeV];Counts", NBINS, edges);
+TH1F *COSMIC_8909    = new TH1F("COSMIC_8909", "CC Interaction (Reco);E [MeV];Counts", NBINS, edges);
+
+gStyle->SetOptStat(0);
+
+// Loop over entries
+Long64_t nentries = t10->GetEntries();
+
+for (Long64_t i = 0; i < nentries; ++i) {
+    t10->GetEntry(i);
+    
+    for (size_t j = 0; j < electron_E_reco->size(); ++j) {
+
+            for (size_t it = 0; it < electron_E_reco->at(j).size(); ++it) {
+
+if ( mode3->at(j) == 7 && ELectron_nc_theta->at(j).at(it) != -999) COSMIC_89099->Fill(ELectron_nc_energy->at(j).at(it));
+if (mode3->at(j) == 7 && ELectron_nc_theta->at(j).at(it) == -999) COSMIC_8909->Fill(electron_E_reco->at(j).at(it));
+
+        if (electron_count->at(j) == 1 &&
+            hadronic_calo_energy->at(j) == 0 &&
+            pion0_count->at(j) == 0 &&
+            gamma_count->at(j) == 0 &&
+            Reco_muon_or_pion->at(j) == 0) {
+
+
+                double theta = electron_theta_reco->at(j).at(it);
+                double energy = electron_E_reco->at(j).at(it);
+                int is_true = True_ELectron->at(j).at(it);
+                double etheta2 = energy * theta * theta;
+
+                if (mode3->at(j) == 7 && is_true == 1 && energy <20000 && theta<0.04) {
+                 
+                    h_signal->Fill(etheta2);
+ 
+                   //COSMIC_8909->Fill(energy);
+                } else if (mode3->at(j) == 1 && is_true == 1 && proton_count->at(j) == 0 && energy <20000  && theta<0.04) {
+                    h_ccqe->Fill(etheta2);
+                } else if (is_true == 0 && energy <20000 && theta<0.04) {
+                    h_pi0misid->Fill(etheta2);
+                }
+
+                if (mode3->at(j) == 7 && ELectron_nc_theta->at(j).at(it) != -999) {
+                    //COSMIC_89099->Fill(ELectron_nc_energy->at(j).at(it));
+                }
+                
+                         
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double values_signal[NB];
+double values_ccqe[NB];
+double values_pi0misid[NB];
+
+for (int i = 0; i < NB; ++i) {
+    values_signal[i]   = h_signal->GetBinContent(i+1);
+    values_ccqe[i]     = h_ccqe->GetBinContent(i+1);
+    values_pi0misid[i] = h_pi0misid->GetBinContent(i+1);
+}
+
+// Print arrays in the requested format
+std::cout << "double values_signal[NB] = {";
+for (int i = 0; i < NB; ++i) {
+    std::cout << values_signal[i];
+    if (i < NB-1) std::cout << ", ";
+}
+std::cout << "};" << std::endl;
+
+std::cout << "double values_ccqe[NB] = {";
+for (int i = 0; i < NB; ++i) {
+    std::cout << values_ccqe[i];
+    if (i < NB-1) std::cout << ", ";
+}
+std::cout << "};" << std::endl;
+
+std::cout << "double values_pi0misid[NB] = {";
+for (int i = 0; i < NB; ++i) {
+    std::cout << values_pi0misid[i];
+    if (i < NB-1) std::cout << ", ";
+}
+std::cout << "};" << std::endl;
+
+/////////////////////////////////////////////////////////////////////////////
+// Clone and combine histograms
+TH1F *COSMIC_8902 = (TH1F*)COSMIC_8909->Clone("COSMIC_8902");
+TH1F *COSMIC_7941 = (TH1F*)COSMIC_8909->Clone("COSMIC_7941");
+TH1F *COSMIC_8903k = (TH1F*)COSMIC_89099->Clone("COSMIC_8903k");
+COSMIC_7941->Add(COSMIC_8903k);
+
+// Arrays for efficiency graph
+Double_t ed[NBINS], y_eff[NBINS], eyl[NBINS], eyh[NBINS], exl[NBINS], exh[NBINS];
+
+for (int x = 0; x < NBINS; ++x) {
+    double y0 = COSMIC_7941->GetBinContent(x + 1);
+    double y1 = COSMIC_8902->GetBinContent(x + 1);
+
+    double eff = (y0 > 0) ? y1 / y0 : 0.0;
+    double err_low = (y0 > 0) ? eff - TEfficiency::ClopperPearson(y0, y1, 0.683, false) : 0;
+    double err_up  = (y0 > 0) ? TEfficiency::ClopperPearson(y0, y1, 0.683, true) - eff : 0;
+
+    Efficiency->SetBinContent(x + 1, eff);
+    Efficiency->SetBinError(x + 1, err_low);
+
+    ed[x]  = (edges[x] + edges[x + 1]) / 2;
+    y_eff[x] = eff;
+    eyl[x] = err_low;
+    eyh[x] = err_up;
+    exl[x] = ed[x] - edges[x];
+    exh[x] = edges[x + 1] - ed[x];
+}
+
+// Create efficiency graph
+TGraphAsymmErrors *gEff = new TGraphAsymmErrors(NBINS, ed, y_eff, exl, exh, eyl, eyh);
+gEff->SetTitle("Efficiency;E [MeV];Efficiency");
+gEff->SetMarkerStyle(20);
+gEff->SetLineColor(kBlue);
+
+//
+// ----------- CANVAS 1: E*theta^2 -------------
+//
+TCanvas *c1 = new TCanvas("c1", "E*theta^2 Histograms", 800, 600);
+h_signal->SetLineColor(kBlue);
+h_ccqe->SetLineColor(kGreen + 2);
+h_pi0misid->SetLineColor(kRed);
+
+h_signal->Draw("HIST");
+h_ccqe->Draw("HIST SAME");
+h_pi0misid->Draw("HIST SAME");
+
+TLegend *leg1 = new TLegend(0.65, 0.70, 0.88, 0.88);
+leg1->AddEntry(h_signal, "Signal (mode3==7)", "l");
+leg1->AddEntry(h_ccqe, "CCQE (mode3==1)", "l");
+leg1->AddEntry(h_pi0misid, "Pi0 misID", "l");
+leg1->Draw();
+
+//
+// ----------- CANVAS 2: Efficiency -------------
+//
+TCanvas *c2 = new TCanvas("c2", "Efficiency", 800, 600);
+gEff->Draw("AP");
+
+//
+// ----------- CANVAS 3: Reco vs True Energy -------------
+//
+TCanvas *c3 = new TCanvas("c3", "Reco vs Missed Electron Energy", 800, 600);
+COSMIC_8909->SetLineColor(kBlue);
+COSMIC_89099->SetLineColor(kRed);
+COSMIC_8909->SetLineWidth(2);
+COSMIC_89099->SetLineWidth(2);
+COSMIC_8909->SetTitle("Reco vs Missed Electron Energy;E [MeV];Counts");
+
+COSMIC_89099->Draw("HIST");
+COSMIC_8909->Draw("HIST SAME");
+
+TLegend *leg3 = new TLegend(0.65, 0.70, 0.88, 0.88);
+leg3->AddEntry(COSMIC_8909, "Reco Electron Energy", "l");
+leg3->AddEntry(COSMIC_89099, "Missed Electron Energy", "l");
+leg3->Draw();
+
+}

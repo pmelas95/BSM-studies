@@ -1,0 +1,494 @@
+{
+#include "TROOT.h"
+#include "TFile.h"
+#include "TTree.h"
+#include "TBrowser.h"
+#include "TH2.h"
+#include "TLorentzVector.h"
+#include "TVector3.h"
+#include "TRandom.h"
+#include <numeric>
+#include <vector>
+
+//gInterpreter->GenerateDictionary("vector<vector<int> >", "vector");
+//gInterpreter->GenerateDictionary("vector<vector<float> >", "vector");
+
+TF1 * tsmear;
+
+TRandom3* rando2 = new TRandom3();
+TRandom3* pion_0rando = new TRandom3();
+TRandom3* randocc = new TRandom3();
+TRandom3* photon_rando = new TRandom3();
+TRandom3* rando = new TRandom3();
+
+
+// FUNCTION FOR THE SMEARING OF THE ANGLE
+tsmear = new TF1( "tsmear", "0.162 + 3.407*pow(x,-1.) + 3.129*pow(x,-0.5)", 0., 999.9 );
+
+
+
+// CREATING A NEW FILE
+TFile *fout=new TFile("/pnfs/dune/scratch/users/pmelas/something_off85.root","RECREATE");
+TTree *t10 = new TTree("t10","a simple Tree with simple variables");
+
+
+// OPENING THE FILE TO TAKE THE INFO FROM THE NEUTRINO
+TFile *f8 = new TFile("/pnfs/dune/persistent/users/pmelas/0off_axis_19pot/something_OffAxis85.root");  // DATA
+TTree *t1 = (TTree*)f8->Get("t1");
+
+
+std::vector<double>* NuMomY2 = 0;
+std::vector<double>* NuMomX2 = 0;
+std::vector<double>* NuMomZ2 = 0;
+std::vector<int>* MODE = 0;
+t1->SetBranchAddress("MODE",&MODE);
+t1->SetBranchAddress("NuMomX2",&NuMomX2);
+t1->SetBranchAddress("NuMomY2",&NuMomY2);
+t1->SetBranchAddress("NuMomZ2",&NuMomZ2);
+
+std::vector<double> MonY_nu,MonX_nu,MonZ_nu;
+std::vector<int> Interaction;
+
+
+  for(Int_t iit=0; iit<t1->GetEntries(); iit++){
+  t1->GetEntry(iit);
+
+  
+  for(int im=0; im<NuMomZ2->size(); im++){
+
+  double NuMomZ= NuMomZ2->at(im);
+  double NuMomX= NuMomX2->at(im);
+  double NuMomY= NuMomY2->at(im);
+
+  MonY_nu.push_back(NuMomY);
+  MonX_nu.push_back(NuMomX);
+  MonZ_nu.push_back(NuMomZ);
+  Interaction.push_back(MODE->at(im));
+}}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+// OPENING THE FILE TO TAKE THE INFO FOR THE FS PARTICLES
+TFile *f1 = new TFile("/pnfs/dune/persistent/users/pmelas/0off_axis_19pot/file_out_85.root");  // DATA
+TTree *fChain = (TTree*)f1->Get("tree");
+
+   Float_t         hadP;
+   Float_t         hadN;
+   Float_t         hadPip;
+   Float_t         hadPim;
+   Float_t         hadPi0;
+   Float_t         hadOther;
+   Float_t         reco_lepton_pdg;
+   Int_t           lepPdg;
+   Int_t nFS;
+const int maxFS = 500;
+Int_t fsPdg[maxFS];
+Float_t fsPx[maxFS];
+Float_t fsPy[maxFS];
+Float_t fsPz[maxFS];
+Float_t fsTrkLen[maxFS];
+Float_t fsE[maxFS];
+Int_t   muonReco[maxFS];
+
+   TBranch        *b_lepPdg;   //!
+   TBranch        *b_hadP;   //!
+   TBranch        *b_hadN;   //!
+   TBranch        *b_hadPip;   //!
+   TBranch        *b_hadPim;   //!
+   TBranch        *b_hadPi0;   //!
+   TBranch        *b_hadOther;   //!
+  TBranch         *b_reco_lepton_pdg;   //!
+TBranch *b_nFS;   //!
+TBranch *b_fsPdg = nullptr;
+TBranch *b_fsPx = nullptr;
+TBranch *b_fsPy = nullptr;
+TBranch *b_fsPz = nullptr;
+TBranch *b_fsTrkLen = nullptr;
+TBranch *b_fsE = nullptr;
+TBranch *b_muonReco = nullptr;
+
+fChain->SetBranchAddress("muonReco", &muonReco, &b_muonReco);
+fChain->SetBranchAddress("hadP", &hadP, &b_hadP);
+fChain->SetBranchAddress("hadN", &hadN, &b_hadN);
+fChain->SetBranchAddress("hadPip", &hadPip, &b_hadPip);
+fChain->SetBranchAddress("hadPim", &hadPim, &b_hadPim);
+fChain->SetBranchAddress("hadPi0", &hadPi0, &b_hadPi0);
+fChain->SetBranchAddress("hadOther", &hadOther, &b_hadOther);
+fChain->SetBranchAddress("reco_lepton_pdg", &reco_lepton_pdg, &b_reco_lepton_pdg);
+fChain->SetBranchAddress("lepPdg", &lepPdg, &b_lepPdg);
+fChain->SetBranchAddress("nFS", &nFS, &b_nFS);
+fChain->SetBranchAddress("fsPdg", fsPdg, &b_fsPdg);
+fChain->SetBranchAddress("fsPx", fsPx, &b_fsPx);
+fChain->SetBranchAddress("fsPy", fsPy, &b_fsPy);
+fChain->SetBranchAddress("fsPz", fsPz, &b_fsPz);
+fChain->SetBranchAddress("fsTrkLen", fsTrkLen, &b_fsTrkLen);
+fChain->SetBranchAddress("fsE", fsE, &b_fsE);
+
+//////////////////////////////////////////////////////////////////////
+std::vector<double> hadronic_caloE;
+std::vector<int> LepPdg,reco_lepton;
+std::vector<std::vector<double>> Electron_energy;
+std::vector<std::vector<double>> Electron_nc_theta;
+std::vector<std::vector<double>> Electron_nc_energy;
+std::vector<std::vector<double>> Electron_theta;
+std::vector<std::vector<int>> True_Electron;
+std::vector<std::vector<double>> final_state_theta;
+std::vector<std::vector<double>> final_state_energies;
+std::vector<std::vector<Int_t>> final_state_pdgs;
+std::vector<std::vector<Float_t>> final_state_px;
+std::vector<std::vector<Float_t>> final_state_py;
+std::vector<std::vector<Float_t>> final_state_pz;
+std::vector<int> proton_counts;
+std::vector<int> pion0_counts;
+std::vector<int> gamma_counts;
+std::vector<int> lambda_c_counts;
+std::vector<int> sigma_c_counts;
+std::vector<int> d_plus_counts;
+std::vector<int> electron_counts;
+
+std::cout<<"events= "<<fChain->GetEntries() <<std::endl;
+
+for(Int_t iit=0; iit<fChain->GetEntries(); iit++){
+  fChain->GetEntry(iit);
+
+
+    std::vector<Float_t> fsE_values;
+    std::vector<Float_t> fsPx_values;
+    std::vector<Float_t> fsPy_values;
+    std::vector<Float_t> fsPz_values;
+    std::vector<Int_t> fsPdg_values;
+    std::vector<double> theta_muon_reco_values;
+    std::vector<double> muon_Ereco_values;
+    std::vector<double> electron_energy;
+    std::vector<double> electron_theta;
+    std::vector<Int_t> True_electron;
+    std::vector<double> electron_nc_energy;
+    std::vector<double> electron_nc_theta;
+
+
+theta_muon_reco_values.clear();
+muon_Ereco_values.clear();
+electron_theta.clear();
+electron_energy.clear();
+True_electron.clear();
+   electron_nc_theta.clear();
+  electron_nc_energy.clear();
+
+int counter_muon =0;
+int counter_proton =0;
+int counter_pion = 0;
+int counter_pion0 = 0;
+int counter_gamma = 0; // For PDG 22 (Photon)
+int counter_lambda_c = 0; // For PDG 4122 (Lambda_c)
+int counter_sigma_c = 0; // For PDG 4222 (Sigma_c)
+int counter_d_plus = 0; // For PDG 411 (D+)
+int counter_electron =0;
+
+hadronic_caloE.push_back(hadN+hadP+hadPip+hadPim+hadPi0+hadOther);
+reco_lepton.push_back(reco_lepton_pdg);
+LepPdg.push_back(lepPdg); // in the cases that we are interested, it gives the neutrino pdg
+
+
+double NuMomY =  MonY_nu.at(iit);
+double NuMomX =  MonX_nu.at(iit);
+double NuMomZ =  MonZ_nu.at(iit);
+
+
+    // Iterate over all final state particles (nFS)
+    for (Int_t j = 0; j < nFS; j++) {
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+if(abs(fsPdg[j]) == 2212 && sqrt( ((fsPx[j])*(fsPx[j]))  +  ((fsPy[j])*(fsPy[j])) + ((fsPz[j])*(fsPz[j])))>50 ) counter_proton = counter_proton +1;
+
+
+if (abs(fsPdg[j]) == 22 && sqrt((fsPx[j] * fsPx[j]) + (fsPy[j] * fsPy[j]) + (fsPz[j] * fsPz[j])) > 50)  counter_gamma = counter_gamma + 1;
+
+// Counting particles with PDG 4122 (Lambda_c)
+if (abs(fsPdg[j]) == 4122 && sqrt((fsPx[j] * fsPx[j]) + (fsPy[j] * fsPy[j]) + (fsPz[j] * fsPz[j])) > 50)  counter_lambda_c = counter_lambda_c + 1;
+
+// Counting particles with PDG 4222 (Sigma_c)
+if (abs(fsPdg[j]) == 4222 && sqrt((fsPx[j] * fsPx[j]) + (fsPy[j] * fsPy[j]) + (fsPz[j] * fsPz[j])) > 50)  counter_sigma_c = counter_sigma_c + 1;
+
+// Counting particles with PDG 411 (D+)
+if (abs(fsPdg[j]) == 411 && sqrt((fsPx[j] * fsPx[j]) + (fsPy[j] * fsPy[j]) + (fsPz[j] * fsPz[j])) > 50)  counter_d_plus = counter_d_plus + 1;
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+       if(abs(fsPdg[j])==13 ){ //assuming 100% efficiency
+////////////////////////////////////////////////////////////////////
+
+const double mmu = 0.1056583745;
+  counter_muon = counter_muon +1;
+  double muon_Etrue      = fsE[j];
+  double ke = (muon_Etrue*0.001) - mmu; // now is in GeV
+  double reco_ke = rando->Gaus( ke, ke*0.05); // fractional muon energy resolution of muons contained in LAr
+  double muon_Ereco = reco_ke + mmu; //GeV
+
+
+  TLorentzVector elec( fsPx[j], 0, fsPz[j], 0 );
+  TLorentzVector netri( NuMomX, 0, NuMomZ, 0 );
+  double Anglexza = netri.Angle( elec.Vect() );
+
+  TLorentzVector elec2( 0, fsPy[j], fsPz[j], 0 );
+  TLorentzVector netri2( 0, NuMomY, NuMomZ, 0 );
+  double Angleyza = netri2.Angle( elec2.Vect() );
+
+  double angleecc = sqrt( Anglexza*Anglexza + Angleyza*Angleyza ); 
+
+  double evalTsmear = tsmear->Eval(muon_Ereco - mmu);
+  if( evalTsmear < 0. ) evalTsmear = 0.;
+  double number3 = evalTsmear/sqrt(2.);
+  double theta_reco_nue_xza = Anglexza*1000 + rando->Gaus(0., number3);
+  double theta_reco_nue_yza = Angleyza*1000 + rando->Gaus(0., number3);
+  double theta_muon_reco   = 0.001*sqrt( theta_reco_nue_xza*theta_reco_nue_xza + theta_reco_nue_yza*theta_reco_nue_yza );
+
+
+
+        //  theta_muon_reco_values.push_back(theta_muon_reco);
+        //  muon_Ereco_values.push_back(muon_Ereco*1000);
+       // fsPdg_values.push_back(fsPdg[j]);
+       // fsPx_values.push_back(fsPx[j]);
+       // fsPy_values.push_back(fsPy[j]);
+       // fsPz_values.push_back(fsPz[j]);
+
+    } // for muons
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+double theta_electron_ccreco =-999;
+double Eelectron_ccreco =-999;
+double true_electron = -999;
+double Eelectron_nc_truth  = -999;
+double theta_electron_nc_truth = -999;
+
+if(abs(fsPdg[j])==11){
+
+  const double m_e = 0.511*0.001;
+  TLorentzVector elec( fsPx[j], 0, fsPz[j], 0 );
+  TLorentzVector netri( NuMomX, 0, NuMomZ, 0 );
+  double Anglexza = netri.Angle( elec.Vect() );
+
+  TLorentzVector elec2( 0, fsPy[j], fsPz[j], 0 );
+  TLorentzVector netri2( 0, NuMomY, NuMomZ, 0 );
+  double Angleyza = netri2.Angle( elec2.Vect() );
+
+  double angleecc = sqrt( Anglexza*Anglexza + Angleyza*Angleyza ); // CC electron angle
+
+
+// fake efficiency...threshold of 300 MeV, eff rising to 100% by 700 MeV
+//if( randocc->Rndm() < ((fsE[j]*0.001)-0.3)*2.5 ) { 
+if( randocc->Rndm() < ((fsE[j]*0.001)-0)*2.5 ) {
+
+  double const1    = 0.1/sqrt(fsE[j]*0.001);
+         Eelectron_ccreco = rando2->Gaus( fsE[j]*0.001, fsE[j]*0.001*(0.03 + const1  ) );
+
+
+ double evalTsmear3 = 3. + tsmear->Eval(Eelectron_ccreco - m_e);
+  if( evalTsmear3 < 0. ) evalTsmear3 = 0.;
+  
+  double number3 = evalTsmear3/sqrt(2.);
+  double theta_reco_nue_xza = Anglexza*1000 + rando2->Gaus(0., number3);
+  double theta_reco_nue_yza = Angleyza*1000 + rando2->Gaus(0., number3);
+         theta_electron_ccreco   = 0.001*sqrt( theta_reco_nue_xza*theta_reco_nue_xza + theta_reco_nue_yza*theta_reco_nue_yza );
+ true_electron =1;
+counter_electron += 1; 
+
+}else{
+Eelectron_nc_truth = fsE[j];
+theta_electron_nc_truth= angleecc;
+
+}} // for electrons
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+if (fsPdg[j] == 111) {  // π⁰
+    TLorentzVector pi0(fsPx[j], fsPy[j], fsPz[j], fsE[j]);  // π⁰ 4-vector (MeV)
+    double e = pi0.E();
+    double mp = 134.9766;  // π⁰ mass (MeV)
+    const double m_e = 0.511*0.001;
+
+    double beta = sqrt(1.0 - (mp * mp) / (e * e));
+    double theta = 3.1416 * pion_0rando->Rndm();
+    double phi = 2.0 * 3.1416 * pion_0rando->Rndm();
+
+    double p = mp / 2.0;  // γ momentum in π⁰ rest frame
+    TLorentzVector g1(0, 0, p, p);
+    TLorentzVector g2(0, 0, -p, p);
+
+    // Rotate around random axis
+    g1.RotateX(theta); g1.RotateZ(phi);
+    g2.RotateX(theta); g2.RotateZ(phi);
+
+    // Boost photons to lab frame
+    g1.Boost(0, 0, beta);
+    g2.Boost(0, 0, beta);
+
+    // Assign γ1 as more energetic
+    TVector3 gamma1, gamma2;
+    if (g1.E() > g2.E()) {
+        gamma1 = g1.Vect();
+        gamma2 = g2.Vect();
+    } else {
+        gamma1 = g2.Vect();
+        gamma2 = g1.Vect();
+    }
+
+    // Rotate to match π⁰ direction
+    TVector3 pi0dir = pi0.Vect().Unit();
+    gamma1.RotateUz(pi0dir);
+    gamma2.RotateUz(pi0dir);
+
+    // === Photon misID probability model ===
+    double g1conv = pion_0rando->Exp(14.0);  // γ conversion distance in cm
+    bool compton = (pion_0rando->Rndm() < 0.15);  // fake e-like dE/dx
+
+    if (g1conv < 2.0 && compton && (gamma2.Mag() < 50. || gamma1.Angle(gamma2) < 0.01)) {
+        double misID_electron_energy = gamma1.Mag();  // in MeV
+
+       // if (randocc->Rndm() < ((misID_electron_energy * 0.001) - 0.3) * 2.5) {
+            TLorentzVector elec(gamma1.X(), 0, gamma1.Z(), 0);
+            TLorentzVector netri(NuMomX, 0, NuMomZ, 0);
+            double Anglexza = netri.Angle(elec.Vect());
+
+            TLorentzVector elec2(0, gamma1.Y(), gamma1.Z(), 0);
+            TLorentzVector netri2(0, NuMomY, NuMomZ, 0);
+            double Angleyza = netri2.Angle(elec2.Vect());
+
+            double angleecc = sqrt(Anglexza * Anglexza + Angleyza * Angleyza);
+
+            Eelectron_ccreco = misID_electron_energy * 0.001;  // to GeV
+            double const1 = 0.1 / sqrt(Eelectron_ccreco);
+            Eelectron_ccreco = pion_0rando->Gaus(Eelectron_ccreco, Eelectron_ccreco * (0.03 + const1));
+
+            double evalTsmear3 = 3. + tsmear->Eval(Eelectron_ccreco - m_e);
+            if (evalTsmear3 < 0.) evalTsmear3 = 0.;
+            double number3 = evalTsmear3 / sqrt(2.);
+
+            double theta_reco_nue_xza = Anglexza * 1000 + pion_0rando->Gaus(0., number3);
+            double theta_reco_nue_yza = Angleyza * 1000 + pion_0rando->Gaus(0., number3);
+             theta_electron_ccreco = 0.001 * sqrt(theta_reco_nue_xza * theta_reco_nue_xza +
+                                                        theta_reco_nue_yza * theta_reco_nue_yza);
+            true_electron = 0;
+            counter_electron += 1;
+       // }
+    } else {
+        counter_pion0 += 1;
+    }
+} // for pions
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  True_electron.push_back(true_electron);
+  electron_theta.push_back(theta_electron_ccreco);
+  electron_energy.push_back(Eelectron_ccreco*1000);
+   electron_nc_theta.push_back(theta_electron_nc_truth);
+  electron_nc_energy.push_back(Eelectron_nc_truth);
+
+
+} // loop over the particles
+
+
+    // Store the vectors for this event
+ //   final_state_energies.push_back(fsE_values);
+ //   final_state_pdgs.push_back(fsPdg_values);
+ //   final_state_px.push_back(fsPx_values);
+ //   final_state_py.push_back(fsPy_values);
+ //   final_state_pz.push_back(fsPz_values);
+ //     final_state_energies.push_back(muon_Ereco_values);
+ //     final_state_theta.push_back(theta_muon_reco_values);
+
+     Electron_nc_theta.push_back(electron_nc_theta);
+     Electron_nc_energy.push_back(electron_nc_energy);
+    electron_counts.push_back(counter_electron);
+    proton_counts.push_back(counter_proton);
+    pion0_counts.push_back(counter_pion0);
+    gamma_counts.push_back(counter_gamma);
+    lambda_c_counts.push_back(counter_lambda_c);
+    sigma_c_counts.push_back(counter_sigma_c);
+    d_plus_counts.push_back(counter_d_plus);
+    Electron_energy.push_back(electron_energy);
+    Electron_theta.push_back(electron_theta);
+    True_Electron.push_back(True_electron);
+
+
+}// end of the loop of dumpTree info
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////  ALL TOGETHER  /////////////////////////////////////////
+
+
+std::vector<int> proton_count;
+std::vector<int> pion0_count;
+std::vector<int> gamma_count;
+std::vector<int> lambda_c_count;
+std::vector<int> sigma_c_count;
+std::vector<int> d_plus_count;
+std::vector<double> hadronic_calo_energy;
+std::vector<int> LepPDG;
+std::vector<std::vector<double>> electron_theta_reco;
+std::vector<std::vector<double>> electron_E_reco, ELectron_nc_theta, ELectron_nc_energy;
+std::vector<std::vector<int>> True_ELectron;
+std::vector<int> mode3,electron_count,Reco_muon_or_pion;
+
+
+t10->Branch("mode3",&mode3);
+t10->Branch("electron_count",&electron_count);
+t10->Branch("Reco_muon_or_pion",&Reco_muon_or_pion);
+t10->Branch("proton_count", &proton_count);
+t10->Branch("pion0_count", &pion0_count);
+t10->Branch("gamma_count", &gamma_count);
+t10->Branch("lambda_c_count", &lambda_c_count);
+t10->Branch("sigma_c_count", &sigma_c_count);
+t10->Branch("d_plus_count", &d_plus_count);
+t10->Branch("electron_theta_reco", &electron_theta_reco);
+t10->Branch("electron_E_reco", &electron_E_reco);
+t10->Branch("True_ELectron", &True_ELectron);
+t10->Branch("hadronic_calo_energy", &hadronic_calo_energy);
+t10->Branch("LepPDG", &LepPDG);
+t10->Branch("ELectron_nc_energy", &ELectron_nc_energy);
+t10->Branch("ELectron_nc_theta", &ELectron_nc_theta);
+
+for(Int_t a=0; a<hadronic_caloE.size(); a++){
+
+  hadronic_calo_energy.push_back(hadronic_caloE.at(a));
+  LepPDG.push_back(LepPdg.at(a));
+Reco_muon_or_pion.push_back(reco_lepton.at(a));
+
+ELectron_nc_theta.push_back(Electron_nc_theta.at(a));
+ELectron_nc_energy.push_back(Electron_nc_energy.at(a));
+    proton_count.push_back(proton_counts.at(a));
+    pion0_count.push_back(pion0_counts.at(a));
+    gamma_count.push_back(gamma_counts.at(a));
+    lambda_c_count.push_back(lambda_c_counts.at(a));
+    sigma_c_count.push_back(sigma_c_counts.at(a));
+    d_plus_count.push_back(d_plus_counts.at(a));
+    electron_count.push_back(electron_counts.at(a));
+
+
+  True_ELectron.push_back(True_Electron.at(a));
+  electron_theta_reco.push_back(Electron_theta.at(a));
+  electron_E_reco.push_back(Electron_energy.at(a));
+mode3.push_back(Interaction.at(a));
+
+}
+
+
+t10->Fill();
+
+fout->cd();
+
+t10->Write();
+
+fout->Close();
+
+
+
+
+}//C1
+
